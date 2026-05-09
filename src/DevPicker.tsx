@@ -1,0 +1,627 @@
+"use client"
+
+import { useEffect } from "react"
+
+declare global {
+  interface Window {
+    __devElementPicker?: { toggle: () => void; destroy: () => void }
+  }
+}
+
+export interface DevPickerProps {
+  /** When true, the picker is mounted regardless of NODE_ENV. Defaults to false (only mounts when NODE_ENV === "development"). */
+  enabledInProduction?: boolean
+}
+
+export function DevPicker({ enabledInProduction = false }: DevPickerProps = {}) {
+  useEffect(() => {
+    if (!enabledInProduction && process.env.NODE_ENV !== "development") return
+    if (typeof window === "undefined") return
+    if (window.__devElementPicker) return
+
+    const C = {
+      bgApp: "#FFFFFF",
+      bgPanel: "#F1F5F9",
+      bgSurf: "#FFFFFF",
+      bgHover: "rgba(15,23,42,0.04)",
+      bgMuted: "#F1F5F9",
+      bdDef: "rgba(15,23,42,0.14)",
+      bdSub: "rgba(15,23,42,0.08)",
+      txPri: "rgba(15,23,42,0.92)",
+      txSec: "rgba(15,23,42,0.64)",
+      txTer: "rgba(15,23,42,0.60)",
+      accent: "#0EA5E9",
+      accentHv: "#0284C7",
+      accentAc: "#0369A1",
+      shadow:
+        "0 10px 15px rgba(15,23,42,0.08), 0 4px 6px rgba(15,23,42,0.04)",
+    }
+    const FONT =
+      "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+
+    type Capture = {
+      id: string
+      selector: string
+      label: string
+      tag: string
+      url: string
+      title: string
+      timestamp: string
+      innerText: string
+      outerHTML: string
+      rect: { x: number; y: number; width: number; height: number }
+      computedStyles: Record<string, string>
+      cssRules: Array<{ selector: string; css: string; media?: string }>
+    }
+
+    const captures: Capture[] = []
+    let picking = false
+    let hoverEl: Element | null = null
+
+    const el = (tag: string, css?: string, txt?: string) => {
+      const e = document.createElement(tag)
+      if (css) e.style.cssText = css
+      if (txt != null) e.textContent = txt
+      return e
+    }
+
+    const mkSvgRaw = (inner: string, size = 18) => {
+      const wrap = document.createElement("span")
+      wrap.style.cssText =
+        "display:inline-flex;align-items:center;justify-content:center;width:" +
+        size +
+        "px;height:" +
+        size +
+        "px;"
+      wrap.innerHTML =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        size +
+        '" height="' +
+        size +
+        '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        inner +
+        "</svg>"
+      return wrap
+    }
+
+    const hl = el(
+      "div",
+      "position:fixed;pointer-events:none;z-index:2147483646;" +
+        "border:2px solid " +
+        C.accent +
+        ";background:rgba(14,165,233,.12);" +
+        "border-radius:3px;box-sizing:border-box;display:none;" +
+        "transition:all 40ms linear;",
+    )
+    const hlLabel = el(
+      "div",
+      "position:absolute;top:-22px;left:0;padding:2px 7px;" +
+        "background:" +
+        C.accent +
+        ";color:#fff;font:11px/1.4 " +
+        FONT +
+        ";" +
+        "border-radius:4px;white-space:nowrap;font-weight:500;",
+    )
+    hl.appendChild(hlLabel)
+
+    const panel = el(
+      "div",
+      "position:fixed;bottom:20px;right:20px;width:340px;" +
+        "z-index:2147483647;background:" +
+        C.bgSurf +
+        ";" +
+        "border:1px solid " +
+        C.bdDef +
+        ";border-radius:12px;" +
+        "box-shadow:" +
+        C.shadow +
+        ";font:12px/1.4 " +
+        FONT +
+        ";" +
+        "color:" +
+        C.txPri +
+        ";overflow:hidden;display:none;",
+    )
+
+    const header = el(
+      "div",
+      "padding:12px 14px;border-bottom:1px solid " +
+        C.bdSub +
+        ";" +
+        "display:flex;align-items:center;gap:10px;",
+    )
+    const dot = el(
+      "div",
+      "width:8px;height:8px;border-radius:50%;background:" +
+        C.accent +
+        ";flex-shrink:0;",
+    )
+    const title = el(
+      "div",
+      "font-weight:600;font-size:13px;flex:1;",
+      "Element picker",
+    )
+    const closeBtn = el(
+      "button",
+      "width:22px;height:22px;border:0;border-radius:5px;background:transparent;" +
+        "color:" +
+        C.txTer +
+        ";cursor:pointer;font:14px/1 " +
+        FONT +
+        ";padding:0;" +
+        "display:flex;align-items:center;justify-content:center;",
+    ) as HTMLButtonElement
+    closeBtn.appendChild(mkSvgRaw('<path d="M18 6 6 18M6 6l12 12"/>', 14))
+    closeBtn.onmouseenter = () => (closeBtn.style.background = C.bgHover)
+    closeBtn.onmouseleave = () => (closeBtn.style.background = "transparent")
+    header.append(dot, title, closeBtn)
+
+    const body = el(
+      "div",
+      "padding:14px;display:flex;flex-direction:column;gap:12px;",
+    )
+
+    const hint = el(
+      "div",
+      "font-size:11px;color:" + C.txSec + ";line-height:1.5;",
+      "Click elements on the page to capture them. Press Esc to stop picking.",
+    )
+
+    const list = el(
+      "div",
+      "display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;",
+    )
+    const empty = el(
+      "div",
+      "padding:18px;text-align:center;font-size:11px;color:" +
+        C.txTer +
+        ";" +
+        "background:" +
+        C.bgMuted +
+        ";border-radius:8px;border:1px dashed " +
+        C.bdDef +
+        ";",
+      "No elements captured yet",
+    )
+    list.appendChild(empty)
+
+    const mkBtn = (label: string, primary: boolean) => {
+      const b = el(
+        "button",
+        "padding:7px 14px;border-radius:8px;font:12px/1 " +
+          FONT +
+          ";" +
+          "font-weight:500;cursor:pointer;transition:all .12s ease;" +
+          "border:1px solid " +
+          (primary ? "rgba(0,0,0,.15)" : C.bdDef) +
+          ";" +
+          "background:" +
+          (primary ? C.accent : C.bgSurf) +
+          ";" +
+          "color:" +
+          (primary ? "#FFFFFF" : C.txPri) +
+          ";" +
+          (primary
+            ? "box-shadow:0 1px 3px rgba(2,132,199,.35),inset 0 1px 0 rgba(255,255,255,.15);"
+            : ""),
+        label,
+      ) as HTMLButtonElement
+      b.onmouseenter = () =>
+        (b.style.background = primary ? C.accentHv : C.bgHover)
+      b.onmouseleave = () =>
+        (b.style.background = primary ? C.accent : C.bgSurf)
+      b.onmousedown = () =>
+        (b.style.background = primary ? C.accentAc : C.bgMuted)
+      b.onmouseup = () =>
+        (b.style.background = primary ? C.accentHv : C.bgHover)
+      return b
+    }
+
+    const outRow = el("div", "display:flex;gap:6px;align-items:stretch;")
+    const out = el(
+      "input",
+      "flex:1;min-width:0;padding:7px 10px;border:1px solid " +
+        C.bdDef +
+        ";" +
+        "border-radius:8px;background:" +
+        C.bgPanel +
+        ";color:" +
+        C.txTer +
+        ";" +
+        "font:11px ui-monospace,Menlo,monospace;outline:none;",
+    ) as HTMLInputElement
+    out.readOnly = true
+    out.placeholder = "Capture output will appear here"
+    out.onclick = () => out.select()
+    const copyBtn = mkBtn("Copy", true)
+    copyBtn.style.flexShrink = "0"
+    outRow.append(out, copyBtn)
+
+    const pasteHint = el(
+      "div",
+      "font-size:11px;color:" +
+        C.txTer +
+        ";display:flex;align-items:center;gap:5px;",
+    )
+    pasteHint.appendChild(
+      mkSvgRaw('<path d="M12 19V5M5 12l7-7 7 7"/>', 12),
+    )
+    pasteHint.appendChild(
+      document.createTextNode("Paste into your AI chat"),
+    )
+
+    const pickBtn = mkBtn("Stop picking", false)
+    pickBtn.style.width = "100%"
+
+    body.append(hint, list, outRow, pasteHint, pickBtn)
+    panel.append(header, body)
+
+    function walkRules(
+      rules: CSSRuleList,
+      target: Element,
+      acc: Capture["cssRules"],
+      media?: string,
+    ) {
+      for (const r of rules as unknown as Iterable<CSSRule>) {
+        try {
+          const styleRule = r as CSSStyleRule
+          if (styleRule.selectorText) {
+            if (target.matches(styleRule.selectorText)) {
+              const entry: Capture["cssRules"][number] = {
+                selector: styleRule.selectorText,
+                css: styleRule.style.cssText,
+              }
+              if (media) entry.media = media
+              acc.push(entry)
+            }
+          }
+          const importRule = r as CSSImportRule
+          if (importRule.styleSheet) {
+            walkRules(
+              importRule.styleSheet.cssRules,
+              target,
+              acc,
+              (importRule.media && importRule.media.mediaText) || media,
+            )
+          } else {
+            const groupRule = r as CSSGroupingRule
+            if (groupRule.cssRules) {
+              const mediaRule = r as CSSMediaRule
+              walkRules(
+                groupRule.cssRules,
+                target,
+                acc,
+                (r as CSSSupportsRule).conditionText ||
+                  (mediaRule.media && mediaRule.media.mediaText) ||
+                  media,
+              )
+            }
+          }
+        } catch {
+          /* noop */
+        }
+      }
+    }
+    function getRules(target: Element) {
+      const acc: Capture["cssRules"] = []
+      for (const sh of Array.from(document.styleSheets)) {
+        let rules: CSSRuleList | undefined
+        try {
+          rules = sh.cssRules
+        } catch {
+          continue
+        }
+        if (!rules) continue
+        walkRules(
+          rules,
+          target,
+          acc,
+          (sh.media && sh.media.mediaText) || undefined,
+        )
+      }
+      return acc
+    }
+
+    const PROPS = [
+      "display","position","top","right","bottom","left","width","height",
+      "margin","padding","border","border-radius","box-sizing","box-shadow",
+      "background","color","opacity",
+      "font-family","font-size","font-weight","font-style","line-height",
+      "letter-spacing","text-align","text-decoration","text-transform","white-space",
+      "flex","flex-direction","flex-wrap","justify-content","align-items","align-self","gap",
+      "grid-template-columns","grid-template-rows","grid-column","grid-row",
+      "overflow","z-index","transform","transition","cursor","object-fit",
+    ]
+    const DEFAULTS: Record<string, string> = {
+      display: "inline", position: "static", top: "auto", right: "auto",
+      bottom: "auto", left: "auto", width: "auto", height: "auto",
+      margin: "0px", padding: "0px", border: "0px none rgb(0, 0, 0)",
+      "border-radius": "0px", "box-sizing": "content-box", "box-shadow": "none",
+      color: "rgb(0, 0, 0)", opacity: "1", "font-style": "normal",
+      "font-weight": "400", "letter-spacing": "normal", "text-align": "start",
+      "text-decoration": "none solid rgb(0, 0, 0)", "text-transform": "none",
+      "white-space": "normal", flex: "0 1 auto", "flex-direction": "row",
+      "flex-wrap": "nowrap", "justify-content": "normal", "align-items": "normal",
+      "align-self": "auto", gap: "normal", "grid-template-columns": "none",
+      "grid-template-rows": "none", "grid-column": "auto", "grid-row": "auto",
+      overflow: "visible", "z-index": "auto", transform: "none",
+      transition: "all 0s ease 0s", cursor: "auto", "object-fit": "fill",
+    }
+    const SKIP = new Set(["none", "normal", "rgba(0, 0, 0, 0)"])
+    function getComputed(target: Element) {
+      const cs = getComputedStyle(target)
+      const m: Record<string, string> = {}
+      for (const p of PROPS) {
+        const v = cs.getPropertyValue(p)
+        if (!v) continue
+        if (DEFAULTS[p] === v) continue
+        if (!(p in DEFAULTS) && SKIP.has(v)) continue
+        m[p] = v
+      }
+      return m
+    }
+
+    function selApprox(target: Element) {
+      const tag = target.tagName.toLowerCase()
+      if (target.id) return tag + "#" + target.id
+      const cls = (target.getAttribute("class") || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)[0]
+      return cls ? tag + "." + cls : tag
+    }
+    function mkLabel(target: Element) {
+      const txt = ((target as HTMLElement).innerText || "").trim().replace(/\s+/g, " ")
+      if (txt) return txt.length > 40 ? txt.slice(0, 40) + "…" : txt
+      return selApprox(target)
+    }
+    function uid() {
+      return (
+        "cap_" +
+        Date.now().toString(36) +
+        "_" +
+        Math.random().toString(36).slice(2, 8)
+      )
+    }
+    function capture(target: Element) {
+      const r = target.getBoundingClientRect()
+      captures.push({
+        id: uid(),
+        selector: selApprox(target),
+        label: mkLabel(target),
+        tag: target.tagName.toLowerCase(),
+        url: location.href,
+        title: document.title,
+        timestamp: new Date().toISOString(),
+        innerText: (target as HTMLElement).innerText || "",
+        outerHTML: target.outerHTML,
+        rect: {
+          x: Math.round(r.x),
+          y: Math.round(r.y),
+          width: Math.round(r.width),
+          height: Math.round(r.height),
+        },
+        computedStyles: getComputed(target),
+        cssRules: getRules(target),
+      })
+      render()
+    }
+
+    function render() {
+      const json = JSON.stringify(captures)
+      out.value = captures.length
+        ? "<web-capture>" + json + "</web-capture>"
+        : ""
+      list.replaceChildren()
+      if (!captures.length) {
+        list.appendChild(empty)
+        return
+      }
+      captures.forEach((cap, i) => {
+        const row = el(
+          "div",
+          "display:flex;align-items:center;gap:8px;padding:6px 8px;" +
+            "background:" +
+            C.bgPanel +
+            ";border:1px solid " +
+            C.bdSub +
+            ";" +
+            "border-radius:6px;font-size:11px;",
+        )
+        const chip = el(
+          "span",
+          "padding:1px 6px;background:" +
+            C.accent +
+            ";color:#fff;" +
+            "border-radius:4px;font-size:9px;font-weight:600;font-family:ui-monospace,Menlo,monospace;",
+          cap.tag,
+        )
+        const name = el(
+          "span",
+          "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;" +
+            "white-space:nowrap;color:" +
+            C.txPri +
+            ";",
+          cap.label,
+        )
+        const dim = el(
+          "span",
+          "font-size:10px;color:" +
+            C.txTer +
+            ";font-family:ui-monospace,Menlo,monospace;",
+          cap.rect.width + "×" + cap.rect.height,
+        )
+        const x = el(
+          "button",
+          "width:18px;height:18px;border:0;border-radius:4px;background:transparent;" +
+            "color:" +
+            C.txTer +
+            ";cursor:pointer;padding:0;flex-shrink:0;" +
+            "display:flex;align-items:center;justify-content:center;",
+        ) as HTMLButtonElement
+        x.appendChild(mkSvgRaw('<path d="M18 6 6 18M6 6l12 12"/>', 12))
+        x.onmouseenter = () => {
+          x.style.background = C.bgHover
+          x.style.color = C.txPri
+        }
+        x.onmouseleave = () => {
+          x.style.background = "transparent"
+          x.style.color = C.txTer
+        }
+        x.onclick = () => {
+          captures.splice(i, 1)
+          render()
+        }
+        row.append(chip, name, dim, x)
+        list.appendChild(row)
+      })
+    }
+
+    function onMove(e: MouseEvent) {
+      const t = e.target as Element
+      if (panel.contains(t) || activator.contains(t)) {
+        hl.style.display = "none"
+        hoverEl = null
+        return
+      }
+      const r = t.getBoundingClientRect()
+      hl.style.display = "block"
+      hl.style.top = r.top + "px"
+      hl.style.left = r.left + "px"
+      hl.style.width = r.width + "px"
+      hl.style.height = r.height + "px"
+      hlLabel.textContent = selApprox(t)
+      hoverEl = t
+    }
+    function onClick(e: MouseEvent) {
+      if (panel.contains(e.target as Node) || activator.contains(e.target as Node)) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      if (hoverEl) capture(hoverEl)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") stop()
+    }
+
+    function start() {
+      picking = true
+      pickBtn.textContent = "Stop picking"
+      dot.style.animation = "dev-picker-pulse 1.2s ease-in-out infinite"
+      document.body.appendChild(hl)
+      document.addEventListener("mousemove", onMove, true)
+      document.addEventListener("click", onClick, true)
+      document.addEventListener("keydown", onKey, true)
+    }
+    function stop() {
+      picking = false
+      pickBtn.textContent = "Pick more elements"
+      dot.style.animation = ""
+      hl.remove()
+      hl.style.display = "none"
+      document.removeEventListener("mousemove", onMove, true)
+      document.removeEventListener("click", onClick, true)
+      document.removeEventListener("keydown", onKey, true)
+    }
+    function showPanel() {
+      if (!panel.parentElement) document.body.appendChild(panel)
+      panel.style.display = "block"
+      activator.style.display = "none"
+    }
+    function hidePanel() {
+      stop()
+      panel.style.display = "none"
+      activator.style.display = "flex"
+    }
+    function destroy() {
+      stop()
+      panel.remove()
+      style.remove()
+      activator.remove()
+      document.removeEventListener("keydown", onShortcut, true)
+      delete window.__devElementPicker
+    }
+
+    pickBtn.onclick = () => (picking ? stop() : start())
+    copyBtn.onclick = () => {
+      if (!out.value) return
+      const done = () => {
+        copyBtn.textContent = "Copied!"
+        setTimeout(() => (copyBtn.textContent = "Copy"), 1200)
+      }
+      const fallback = () => {
+        out.select()
+        document.execCommand("copy")
+        done()
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(out.value).then(done, fallback)
+      } else fallback()
+    }
+    closeBtn.onclick = hidePanel
+
+    const style = el("style") as HTMLStyleElement
+    style.textContent =
+      "@keyframes dev-picker-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}"
+    document.head.appendChild(style)
+
+    const activator = el(
+      "button",
+      "position:fixed;bottom:16px;right:16px;z-index:2147483645;" +
+        "width:36px;height:36px;border-radius:50%;border:1px solid " +
+        C.bdDef +
+        ";" +
+        "background:" +
+        C.accent +
+        ";color:#fff;cursor:pointer;" +
+        "box-shadow:" +
+        C.shadow +
+        ";padding:0;" +
+        "display:flex;align-items:center;justify-content:center;",
+    ) as HTMLButtonElement
+    activator.title = "Toggle picker (Cmd+Shift+.)"
+    activator.appendChild(
+      mkSvgRaw(
+        '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
+        18,
+      ),
+    )
+    activator.onclick = () => {
+      showPanel()
+      if (!picking) start()
+    }
+
+    function onShortcut(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === ".") {
+        e.preventDefault()
+        if (panel.style.display === "none" || !panel.parentElement) {
+          showPanel()
+          if (!picking) start()
+        } else {
+          hidePanel()
+        }
+      }
+    }
+    document.addEventListener("keydown", onShortcut, true)
+    document.body.appendChild(activator)
+
+    window.__devElementPicker = {
+      toggle: () => {
+        if (panel.style.display === "none" || !panel.parentElement) {
+          showPanel()
+          if (!picking) start()
+        } else {
+          hidePanel()
+        }
+      },
+      destroy,
+    }
+
+    return () => {
+      destroy()
+    }
+  }, [enabledInProduction])
+
+  return null
+}

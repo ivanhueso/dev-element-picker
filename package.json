@@ -1,0 +1,62 @@
+{
+  "name": "dev-element-picker",
+  "version": "1.0.0",
+  "description": "A tiny React dev-tool overlay that lets you click any DOM element on your page and copy its tag, selector, computed styles, matched CSS rules and outerHTML to the clipboard. Designed to be pasted into any AI coding assistant (Claude Code, Cursor, Codex, Copilot Chat, etc.) so the model has exact context for design tweaks.",
+  "keywords": [
+    "react",
+    "dev-tools",
+    "element-picker",
+    "ai",
+    "design",
+    "css",
+    "inspector",
+    "copy-paste",
+    "developer-tools"
+  ],
+  "author": "Ivan Hueso",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivanhueso/dev-element-picker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ivanhueso/dev-element-picker/issues"
+  },
+  "homepage": "https://github.com/ivanhueso/dev-element-picker#readme",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --external react",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch --external react",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.40",
+    "@types/react": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
