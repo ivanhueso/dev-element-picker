@@ -4,6 +4,10 @@ A tiny React dev-tool overlay that lets you click any DOM element on your page a
 
 Designed for one specific workflow: **you're tweaking a UI and want your AI assistant to know exactly which element you mean and how it looks**, without you having to write "the third card on the homepage" or paste a screenshot.
 
+<video src="https://media.pandaidx.com/platform/videos/video-optimized-65e54cb7.mp4" controls muted playsinline width="800"></video>
+
+> Demo: pick an element, hit Copy, paste into your AI chat. The model gets the exact selector, computed styles, and matched CSS rules.
+
 ## Features
 
 - **Floating activator** in the bottom-right corner of your dev environment
