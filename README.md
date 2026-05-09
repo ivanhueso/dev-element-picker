@@ -13,7 +13,7 @@ Designed for one specific workflow: **you're tweaking a UI and want your AI assi
 - **Capture payload** includes: tag, computed selector, `outerHTML`, `innerText`, bounding rect, computed styles (filtered to non-default values), and all matched CSS rules from every stylesheet
 - **One-click copy** wraps the payload in a `<web-capture>...</web-capture>` JSON tag, ready to paste into any AI chat
 - **Keyboard shortcut**: `Cmd/Ctrl + Shift + .` to toggle the panel
-- **Dev-only by default** — gated by `process.env.NODE_ENV === "development"`, opt-in for production
+- **You decide when to mount it** — the package does no env detection. Wrap it in your own dev-only condition (see below).
 - Zero runtime dependencies, < 10 KB minified
 
 ## Install
@@ -30,7 +30,7 @@ Peer dependency: `react >= 16.8`.
 
 ## Usage
 
-Mount the component once at the root of your app. It renders nothing until activated.
+Mount the component once at the root of your app, gated to dev only. It renders nothing until activated.
 
 ```tsx
 // app/layout.tsx (Next.js App Router)
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html>
       <body>
         {children}
-        <DevPicker />
+        {process.env.NODE_ENV === "development" && <DevPicker />}
       </body>
     </html>
   )
@@ -56,7 +56,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Component {...pageProps} />
-      <DevPicker />
+      {process.env.NODE_ENV === "development" && <DevPicker />}
     </>
   )
 }
@@ -70,21 +70,13 @@ export function Root() {
   return (
     <>
       <App />
-      <DevPicker />
+      {import.meta.env.DEV && <DevPicker />}
     </>
   )
 }
 ```
 
-### Enable in production
-
-By default the picker only mounts when `process.env.NODE_ENV === "development"`. To enable it in a staging or production build:
-
-```tsx
-<DevPicker enabledInProduction />
-```
-
-(You usually don't want this — keep it dev-only.)
+The package itself does **not** check `NODE_ENV` — that's intentional. Bundlers can dead-code-eliminate the entire import in production when you wrap it with the env guard above.
 
 ## How to use it with your AI assistant
 
@@ -160,7 +152,7 @@ window.__devElementPicker?.destroy()  // tear down completely
 ## FAQ
 
 **Will it ship in my production bundle?**
-The component renders `null` and bails out in `useEffect` when `NODE_ENV !== "development"`, so the runtime is a no-op. If your bundler strips dead code based on `process.env.NODE_ENV`, the body is removed entirely. Tree-shaking aside, the import is < 10 KB.
+Yes — unless you guard the import. The package no longer auto-detects `NODE_ENV`; that decision is yours. The recommended pattern is `{process.env.NODE_ENV === "development" && <DevPicker />}` (see Usage). When wrapped that way, modern bundlers (Next.js, Vite, webpack with `DefinePlugin`) statically replace `process.env.NODE_ENV` and dead-code-eliminate the import in production builds.
 
 **Does it interfere with my app's event handlers?**
 While picking, click events are captured at the document level with `stopImmediatePropagation` so your app doesn't see them. The picker stops listening as soon as you press `Esc` or click "Stop picking".

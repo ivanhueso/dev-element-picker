@@ -8,14 +8,8 @@ declare global {
   }
 }
 
-export interface DevPickerProps {
-  /** When true, the picker is mounted regardless of NODE_ENV. Defaults to false (only mounts when NODE_ENV === "development"). */
-  enabledInProduction?: boolean
-}
-
-export function DevPicker({ enabledInProduction = false }: DevPickerProps = {}) {
+export function DevPicker() {
   useEffect(() => {
-    if (!enabledInProduction && process.env.NODE_ENV !== "development") return
     if (typeof window === "undefined") return
     if (window.__devElementPicker) return
 
@@ -621,7 +615,7 @@ export function DevPicker({ enabledInProduction = false }: DevPickerProps = {}) 
     return () => {
       destroy()
     }
-  }, [enabledInProduction])
+  }, [])
 
   return null
 }
