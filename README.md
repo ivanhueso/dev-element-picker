@@ -4,8 +4,6 @@ A tiny React dev-tool overlay that lets you click any DOM element on your page a
 
 Designed for one specific workflow: **you're tweaking a UI and want your AI assistant to know exactly which element you mean and how it looks**, without you having to write "the third card on the homepage" or paste a screenshot.
 
-![dev-element-picker screenshot placeholder](https://via.placeholder.com/800x400/0EA5E9/FFFFFF?text=dev-element-picker)
-
 ## Features
 
 - **Floating activator** in the bottom-right corner of your dev environment
