@@ -1,6 +1,6 @@
 {
   "name": "dev-element-picker",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A tiny React dev-tool overlay that lets you click any DOM element on your page and copy its tag, selector, computed styles, matched CSS rules and outerHTML to the clipboard. Designed to be pasted into any AI coding assistant (Claude Code, Cursor, Codex, Copilot Chat, etc.) so the model has exact context for design tweaks.",
   "keywords": [
     "react",
